@@ -2,6 +2,7 @@ package org.example.Repo;
 import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.datatype.jsr310.JavaTimeModule;
+import org.example.crypto.CryptoService;
 import org.example.password.model.Password;
 
 
@@ -14,8 +15,13 @@ import java.util.List;
 public class FilePasswordRepo implements PasswordRepository {
 private static final Path FILE_PATH = Paths.get("data", "encryptedData.json");
 private final ObjectMapper mapper;
-public FilePasswordRepo() {
-	mapper = new ObjectMapper();
+private final CryptoService crypto;
+private final String masterPassword;
+
+public FilePasswordRepo(String masterPassword) {
+	this.masterPassword = masterPassword;
+    this.crypto = new CryptoService();
+    mapper = new ObjectMapper();
 	mapper.registerModule(new JavaTimeModule());
     initFile();
 }
@@ -33,36 +39,28 @@ private void initFile(){
     }
 }
 
-@Override
+    @Override
     public void saveAll(List<Password> passwords) {
-    try{
-        String json = mapper.writeValueAsString(passwords);
-        Files.write(
-                FILE_PATH,
-                json.getBytes(),
-                StandardOpenOption.TRUNCATE_EXISTING
-        );
+        try {
+            String json = mapper.writeValueAsString(passwords);
+            byte[] encrypted = crypto.encrypt(json, masterPassword);
+            Files.write(FILE_PATH, encrypted, StandardOpenOption.TRUNCATE_EXISTING);
+        } catch (Exception e) {
+            throw new RuntimeException("Failed to save vault");
+        }
     }
-    catch(IOException e){
-        throw new RuntimeException("Unable to save passwords", e);
-    }
-}
 
     @Override
+
     public List<Password> getAll() {
         try {
-            String json = Files.readString(FILE_PATH);
+            byte[] encrypted = Files.readAllBytes(FILE_PATH);
+            if (encrypted.length == 0) return new ArrayList<>();
 
-            if (json.isBlank()) {
-                return new ArrayList<>();
-            }
-
-            return mapper.readValue(
-                    json,
-                    new TypeReference<List<Password>>() {}
-            );
-        } catch (IOException e) {
-            throw new RuntimeException("Failed to load passwords", e);
+            String json = crypto.decrypt(encrypted, masterPassword);
+            return mapper.readValue(json, new TypeReference<List<Password>>() {});
+        } catch (Exception e) {
+            throw new RuntimeException("Failed to unlock vault");
         }
     }
 
