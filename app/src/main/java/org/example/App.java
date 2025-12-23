@@ -11,12 +11,19 @@ public class App {
 
     public static void main(String[] args) {
 
-        FilePasswordRepo repo = new FilePasswordRepo();
-        Service service = new Service(repo);
+
 
         Scanner in = new Scanner(System.in);
 
         System.out.println("🔐 Password Manager CLI");
+        System.out.println("Enter the master password");
+
+        String masterPassword = in.nextLine();
+
+        FilePasswordRepo repo = new FilePasswordRepo(masterPassword);
+        Service service = new Service(repo);
+
+
 
         while (true) {
             System.out.println("\nCommands: add | delete | view | exit");
